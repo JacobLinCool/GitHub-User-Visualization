@@ -1,0 +1,16 @@
+{
+	"name": "workspace",
+	"dockerComposeFile": "docker-compose.yml",
+	"service": "workspace",
+	"workspaceFolder": "/workspace",
+	"settings": {},
+	"extensions": [
+		"dbaeumer.vscode-eslint",
+		"esbenp.prettier-vscode",
+		"GitHub.copilot",
+		"svelte.svelte-vscode",
+		"bradlc.vscode-tailwindcss"
+	],
+	"postCreateCommand": ["pnpm", "i"],
+	"remoteUser": "node"
+}

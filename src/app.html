@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<link rel="icon" href="%sveltekit.assets%/favicon.png" />
+		<meta name="viewport" content="width=device-width" />
+		%sveltekit.head%
+		<link
+			href="https://fonts.googleapis.com/css?family=Roboto:300,400,500|Material+Icons&display=swap"
+			rel="stylesheet"
+		/>
+	</head>
+	<body data-sveltekit-preload-data="hover">
+		<main>%sveltekit.body%</main>
+		<style>
+			* {
+				font-family: Roboto, sans-serif;
+				position: relative;
+			}
+			html,
+			body {
+				position: absolute;
+				top: 0;
+				left: 0;
+				height: 100%;
+				width: 100%;
+				margin: 0;
+				padding: 0;
+				overflow: hidden;
+			}
+			main {
+				height: 100%;
+				width: 100%;
+				overflow: auto;
+			}
+		</style>
+	</body>
+</html>
