@@ -57,6 +57,7 @@ export async function graph(
 		spinner?.info("Using cached GitHub data");
 		const data = JSON.parse(fs.readFileSync(cachefile, "utf-8"));
 		Object.assign(user, data.user);
+		user.name = user.name || username;
 		for (const repo of data.repos) {
 			repos.set(repo.name, repo);
 		}
