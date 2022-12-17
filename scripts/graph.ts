@@ -1,8 +1,18 @@
+import fs from "node:fs";
+import path from "node:path";
 import { config } from "dotenv";
 import { Octokit } from "octokit";
 import type { Ora } from "ora";
 
 config();
+
+const CACHE_TIME = Number(process.env.CACHE_TIME) || 1000 * 60 * 60;
+
+const dir = path.resolve("data/_github");
+
+if (!fs.existsSync(dir)) {
+	fs.mkdirSync(dir, { recursive: true });
+}
 
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
 
@@ -38,48 +48,110 @@ export async function graph(
 		url: "",
 	};
 
-	spinner?.start("Fetching data from GitHub");
+	const cachefile = path.join(dir, `${username}.json`);
+	const skip = fs.existsSync(cachefile) && Date.now() - fs.statSync(cachefile).mtimeMs < CACHE_TIME;
 
-	while (anchor > created) {
-		const to = new Date(anchor);
-		const from = new Date(anchor.getTime() - 6 * 30 * 24 * 60 * 60 * 1000);
-		if (spinner) {
-			spinner.text = `Fetching data from ${from.toDateString()} to ${to.toDateString()}`;
+	if (skip) {
+		spinner?.info("Using cached GitHub data");
+		const data = JSON.parse(fs.readFileSync(cachefile, "utf-8"));
+		Object.assign(user, data.user);
+		for (const repo of data.repos) {
+			repos.set(repo.name, repo);
 		}
+	} else {
+		spinner?.start("Fetching data from GitHub");
 
-		const result = (await octokit.graphql(ql(), { username, from, to, max })) as Result;
+		const issue_repos = new Set<string>();
+		while (anchor > created) {
+			const to = new Date(anchor);
+			const from = new Date(anchor.getTime() - 6 * 30 * 24 * 60 * 60 * 1000);
+			if (spinner) {
+				spinner.text = `Fetching data from ${from.toDateString()} to ${to.toDateString()}`;
+			}
 
-		Object.assign(user, {
-			name: result.user.name,
-			company: result.user.company,
-			avatar: result.user.avatar,
-			created: result.user.created,
-			url: result.user.url,
-		});
+			const result = (await octokit.graphql(query_meta(), {
+				username,
+				from,
+				to,
+				max,
+			})) as MetaResult;
 
-		for (const { repository } of result.user.contribs.commit) {
-			repos.set(repository.name, { issues: [], ...repos.get(repository.name), ...repository });
-		}
-		for (const { repository } of result.user.contribs.issue) {
-			repos.set(repository.name, {
-				...repos.get(repository.name),
-				...repository,
-				issues: repository.issues.nodes.map((issue) => ({
-					...issue,
-					participants: issue.participants.nodes.map((participant) => participant.login),
-				})),
+			Object.assign(user, {
+				name: result.user.name,
+				company: result.user.company,
+				avatar: result.user.avatar,
+				created: result.user.created,
+				url: result.user.url,
 			});
+
+			for (const { repository } of result.user.contribs.commit) {
+				repos.set(repository.name, { issues: [], ...repos.get(repository.name), ...repository });
+			}
+			for (const { repository } of result.user.contribs.issue) {
+				issue_repos.add(repository.name);
+				repos.set(repository.name, {
+					issues: [],
+					...repos.get(repository.name),
+					...repository,
+				});
+			}
+
+			created = new Date(result.user.created);
+			anchor = new Date(from.getTime() - 1);
 		}
 
-		created = new Date(result.user.created);
-		anchor = new Date(from.getTime() - 1);
-	}
+		for (const name of issue_repos) {
+			spinner?.start(`Fetching issues for ${name}`);
 
-	spinner?.succeed(
-		`Fetched data from GitHub for ${username} (${
-			repos.size
-		} Repo, ${created.toDateString()} - ${new Date().toDateString()})`,
-	);
+			const issues: { title: string; created: string; number: number; participants: string[] }[] =
+				[];
+			let total = 999999;
+			let done = false;
+			let cursor: string | undefined = undefined;
+			while (!done) {
+				const { repository } = (await octokit.graphql(query_issues(), {
+					owner: name.split("/")[0],
+					repo: name.split("/")[1],
+					username,
+					to: cursor,
+				})) as IssuesResult;
+
+				total = repository.issues.total;
+
+				for (const issue of repository.issues.nodes) {
+					issues.push({
+						title: issue.title,
+						created: issue.created,
+						number: issue.number,
+						participants: issue.participants.nodes.map((user) => user.login),
+					});
+				}
+
+				if (!repository.issues.page.next) {
+					done = true;
+				}
+
+				cursor = repository.issues.page.cursor;
+				if (spinner) {
+					spinner.text = `Fetching issues for ${name} (${issues.length}/${total})`;
+				}
+			}
+
+			spinner?.succeed(`Fetched issues for ${name} (${issues.length} Issues)`);
+			const repo = repos.get(name);
+			if (repo) {
+				repo.issues = issues;
+			}
+		}
+
+		spinner?.succeed(
+			`Fetched data from GitHub for ${username} (${
+				repos.size
+			} Repo, ${created.toDateString()} - ${new Date().toDateString()})`,
+		);
+
+		fs.writeFileSync(cachefile, JSON.stringify({ user, repos: [...repos.values()] }));
+	}
 
 	const sorted_repos = new Map([...repos].sort());
 	const sorted_issues = Object.fromEntries(
@@ -94,7 +166,7 @@ export async function graph(
 	};
 }
 
-export function ql(): string {
+export function query_meta(): string {
 	return `
 	query ($username: String!, $from: DateTime!, $to: DateTime!, $max: Int!) {
 		user(login: $username) {
@@ -115,17 +187,30 @@ export function ql(): string {
 					repository {
 						name: nameWithOwner
 						description
-						issues(filterBy: { createdBy: $username }, last: 100) {
-							nodes {
-								title
-								created: createdAt
-								number
-								participants(first: 10) {
-									nodes {
-										login
-									}
-								}
-							}
+					}
+				}
+			}
+		}
+	}`;
+}
+
+export function query_issues(): string {
+	return `
+	query ($owner: String!, $repo: String!, $to: String, $username: String!) {
+		repository(owner: $owner, name: $repo) {
+			issues(filterBy: { createdBy: $username }, last: 100, before: $to) {
+				total: totalCount
+				page: pageInfo {
+					next: hasPreviousPage
+					cursor: startCursor
+				}
+				nodes {
+					title
+					created: createdAt
+					number
+					participants(first: 10) {
+						nodes {
+							login
 						}
 					}
 				}
@@ -134,7 +219,7 @@ export function ql(): string {
 	}`;
 }
 
-interface Result {
+interface MetaResult {
 	user: {
 		login: string;
 		name: string;
@@ -153,18 +238,28 @@ interface Result {
 				repository: {
 					name: string;
 					description: string;
-					issues: {
-						nodes: {
-							title: string;
-							created: string;
-							number: number;
-							participants: {
-								nodes: {
-									login: string;
-								}[];
-							};
-						}[];
-					};
+				};
+			}[];
+		};
+	};
+}
+
+interface IssuesResult {
+	repository: {
+		issues: {
+			total: number;
+			page: {
+				next: boolean;
+				cursor: string;
+			};
+			nodes: {
+				title: string;
+				created: string;
+				number: number;
+				participants: {
+					nodes: {
+						login: string;
+					}[];
 				};
 			}[];
 		};
