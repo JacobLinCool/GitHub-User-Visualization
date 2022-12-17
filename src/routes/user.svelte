@@ -19,6 +19,6 @@
 	</div>
 	<div style="flex: 1">
 		<h1 style="font-size: 2rem; margin: 0; color: black">{user.name}</h1>
-		<p style="font-size: 1rem; margin: 0; color: gray">{user.company}</p>
+		<p style="font-size: 1rem; margin: 0; color: gray">{user.company || ""}</p>
 	</div>
 </a>
