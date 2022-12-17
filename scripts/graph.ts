@@ -63,7 +63,7 @@ export async function graph(
 	} else {
 		spinner?.start("Fetching data from GitHub");
 
-		const issue_repos = new Set<string>();
+		let issue_repos = new Set<string>();
 		while (anchor > created) {
 			const to = new Date(anchor);
 			const from = new Date(anchor.getTime() - 6 * 30 * 24 * 60 * 60 * 1000);
@@ -101,6 +101,7 @@ export async function graph(
 			created = new Date(result.user.created);
 			anchor = new Date(from.getTime() - 1);
 		}
+		issue_repos = new Set([...issue_repos].sort());
 
 		const issue_pool = new Pool(8);
 		const fetching: string[] = [];
