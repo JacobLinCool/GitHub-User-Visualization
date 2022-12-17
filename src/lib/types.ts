@@ -5,6 +5,8 @@ export interface Commit {
 	date: Date;
 	message: string;
 	files: string[];
+	langs: Record<string, number>;
+	types: Record<string, number>;
 }
 
 export type Commits = Record<RepoName, Commit[]>;
