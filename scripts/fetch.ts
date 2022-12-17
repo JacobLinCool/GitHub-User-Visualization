@@ -25,9 +25,20 @@ if (!fs.existsSync(dir)) {
 	fs.writeFileSync(`${dir}/repos.json`, JSON.stringify(Array.from(repos.values()), null, 2));
 	fs.writeFileSync(`${dir}/issues.json`, JSON.stringify(issues, null, 2));
 
+	const clone_pool = new Pool(8);
+	const cloning: string[] = [];
 	for (const repository of repos) {
-		await clone(repository.name, spinner);
+		clone_pool.push(async () => {
+			cloning.push(repository.name);
+			spinner.start(`Cloning ${cloning.join(", ")}`);
+			await clone(repository.name, spinner);
+			cloning.splice(cloning.indexOf(repository.name), 1);
+			if (cloning.length > 0) {
+				spinner.start();
+			}
+		});
 	}
+	await clone_pool.run();
 	spinner.succeed(`Cloned ${repos.length} repositories`);
 
 	const repo_commits: Record<
@@ -35,18 +46,21 @@ if (!fs.existsSync(dir)) {
 		{ sha: string; date: string; message: string; files: string[] }[]
 	> = {};
 
-	const pool = new Pool(os.cpus().length);
+	const checkout_pool = new Pool(os.cpus().length);
 	const checking: string[] = [];
 	for (const repository of repos) {
-		pool.push(async () => {
+		checkout_pool.push(async () => {
 			checking.push(repository.name);
-			spinner.start(`Checking out commits for ${checking}`);
+			spinner.start(`Checking out commits for ${checking.join(", ")}`);
 			repo_commits[repository.name] = await commits(repository.name, username);
 			spinner.succeed(`Checked out commits for ${repository.name}`);
 			checking.splice(checking.indexOf(repository.name), 1);
+			if (checking.length > 0) {
+				spinner.start();
+			}
 		});
 	}
-	await pool.run();
+	await checkout_pool.run();
 	fs.writeFileSync(`${dir}/commits.json`, JSON.stringify(repo_commits, null, 2));
 	spinner.succeed(`Checked out commits for ${repos.length} repositories`);
 })();

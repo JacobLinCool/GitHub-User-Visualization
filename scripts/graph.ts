@@ -1,8 +1,10 @@
+import os from "node:os";
 import fs from "node:fs";
 import path from "node:path";
 import { config } from "dotenv";
 import { Octokit } from "octokit";
 import type { Ora } from "ora";
+import { Pool } from "@jacoblincool/puddle";
 
 config();
 
@@ -100,49 +102,60 @@ export async function graph(
 			anchor = new Date(from.getTime() - 1);
 		}
 
+		const issue_pool = new Pool(8);
+		const fetching: string[] = [];
 		for (const name of issue_repos) {
-			spinner?.start(`Fetching issues for ${name}`);
+			issue_pool.push(async () => {
+				fetching.push(name);
+				spinner?.start(`Fetching issues for ${fetching.join(", ")}`);
 
-			const issues: { title: string; created: string; number: number; participants: string[] }[] =
-				[];
-			let total = 999999;
-			let done = false;
-			let cursor: string | undefined = undefined;
-			while (!done) {
-				const { repository } = (await octokit.graphql(query_issues(), {
-					owner: name.split("/")[0],
-					repo: name.split("/")[1],
-					username,
-					to: cursor,
-				})) as IssuesResult;
+				const issues: { title: string; created: string; number: number; participants: string[] }[] =
+					[];
+				let total = 999999;
+				let done = false;
+				let cursor: string | undefined = undefined;
+				while (!done) {
+					const { repository } = (await octokit.graphql(query_issues(), {
+						owner: name.split("/")[0],
+						repo: name.split("/")[1],
+						username,
+						to: cursor,
+					})) as IssuesResult;
 
-				total = repository.issues.total;
+					total = repository.issues.total;
 
-				for (const issue of repository.issues.nodes) {
-					issues.push({
-						title: issue.title,
-						created: issue.created,
-						number: issue.number,
-						participants: issue.participants.nodes.map((user) => user.login),
-					});
+					for (const issue of repository.issues.nodes) {
+						issues.push({
+							title: issue.title,
+							created: issue.created,
+							number: issue.number,
+							participants: issue.participants.nodes.map((user) => user.login),
+						});
+					}
+
+					if (!repository.issues.page.next) {
+						done = true;
+					}
+
+					cursor = repository.issues.page.cursor;
+					if (spinner) {
+						spinner.text = `Fetching issues for ${name} (${issues.length}/${total})`;
+					}
 				}
 
-				if (!repository.issues.page.next) {
-					done = true;
+				spinner?.succeed(`Fetched issues for ${name} (${issues.length} Issues)`);
+				const repo = repos.get(name);
+				if (repo) {
+					repo.issues = issues;
 				}
 
-				cursor = repository.issues.page.cursor;
-				if (spinner) {
-					spinner.text = `Fetching issues for ${name} (${issues.length}/${total})`;
+				fetching.splice(fetching.indexOf(name), 1);
+				if (fetching.length > 0) {
+					spinner?.start();
 				}
-			}
-
-			spinner?.succeed(`Fetched issues for ${name} (${issues.length} Issues)`);
-			const repo = repos.get(name);
-			if (repo) {
-				repo.issues = issues;
-			}
+			});
 		}
+		await issue_pool.run();
 
 		spinner?.succeed(
 			`Fetched data from GitHub for ${username} (${
