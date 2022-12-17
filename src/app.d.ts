@@ -9,3 +9,5 @@ declare namespace App {
 	// interface PageData {}
 	// interface Platform {}
 }
+
+declare const BUILD_TIMESTAMP: string;

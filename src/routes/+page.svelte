@@ -13,6 +13,8 @@
 	let commits: Commits;
 	let issues: Issues;
 
+	console.log("Version", BUILD_TIMESTAMP);
+
 	async function run() {
 		user = await data.user();
 		progress.update((n) => n + 10);
