@@ -20,6 +20,7 @@ runs:
       with:
         repository: JacobLinCool/GitHub-User-Visualization
         path: vis-action
+        token: ${{ inputs.token }}
 
     - name: Setup PNPM
       uses: pnpm/action-setup@v2.2.4
