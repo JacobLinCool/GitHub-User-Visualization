@@ -42,13 +42,11 @@
 	});
 </script>
 
-<div style="display: flex; flex-direction: column; height: 100%; width: 100%">
-	<div
-		style="min-height: 2.4rem; display: flex; align-items: center; padding: 0 1rem; background: #333; color: #fff"
-	>
+<div class="flex flex-col h-full w-full">
+	<div class="min-h-[2.4rem] flex items-center px-4 bg-slate-800 text-white">
 		{user?.name ? `GitHub User Visualization for ${user.name}` : "loading data ..."}
 	</div>
-	<div style="flex: 1; display: flex; flex-direction: column">
+	<div class="flex flex-col flex-1">
 		{#if user}
 			<UserSection {user} />
 		{/if}

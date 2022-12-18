@@ -233,14 +233,12 @@
 	}
 </script>
 
-<div
-	style="flex: 1; display: flex; margin: 0 1rem 1rem 1rem; text-decoration: none; border-radius: 0.5rem; padding: 1rem; background: #f8f8f8"
->
-	<div style="flex:1">
-		<div id="line-chart" style="border: #ccc solid 1px; border-radius: 0.4rem; margin: 0.4rem" />
-		<div id="bar-chart" style="border: #ccc solid 1px; border-radius: 0.4rem; margin: 0.4rem" />
+<div class="flex-1 flex m-4 mt-0 no-underline rounded-lg p-4 bg-slate-50">
+	<div class="flex-1">
+		<div id="line-chart" class="border border-slate-300 rounded-md m-2" />
+		<div id="bar-chart" class="border border-slate-300 rounded-md m-2" />
 	</div>
-	<div style="flex:1">
-		<div id="network" style="border: #ccc solid 1px; border-radius: 0.4rem; margin: 0.4rem" />
+	<div class="flex-1">
+		<div id="network" class="border border-slate-300 rounded-md m-2" />
 	</div>
 </div>

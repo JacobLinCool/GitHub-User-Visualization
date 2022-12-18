@@ -5,20 +5,16 @@
 </script>
 
 <a
-	style="display: flex; align-items: center; margin: 1rem; text-decoration: none; border-radius: 0.5rem; padding: 1rem; background: #f4f4f4"
+	class="flex items-center m-4 no-underline rounded-lg p-4 bg-slate-100"
 	href={user.url}
 	target="_blank"
 	rel="noreferrer"
 >
-	<div style="margin-right: 1rem">
-		<img
-			src={user.avatar}
-			alt={user.name}
-			style="width: 5rem; height: 5rem; border-radius: 42.5%; object-fit: cover"
-		/>
+	<div class="mr-4">
+		<img src={user.avatar} alt={user.name} class="w-20 h-20 rounded-[42.5%] object-cover" />
 	</div>
-	<div style="flex: 1">
-		<h1 style="font-size: 2rem; margin: 0; color: black">{user.name}</h1>
-		<p style="font-size: 1rem; margin: 0; color: gray">{user.company || ""}</p>
+	<div class="flex-1">
+		<h1 class="text-3xl m-0 text-slate-800">{user.name}</h1>
+		<p class="text-xl m-0 text-slate-500">{user.company || ""}</p>
 	</div>
 </a>
