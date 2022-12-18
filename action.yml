@@ -1,0 +1,46 @@
+name: "Create User Visualization"
+description: "Create a static visualization of a GitHub user"
+inputs:
+  token:
+    description: "GitHub Personal Access Token"
+    required: true
+  username:
+    description: "GitHub username"
+    required: true
+  output:
+    description: "Output directory"
+    required: false
+    default: "vis"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+      with:
+        repository: JacobLinCool/GitHub-User-Visualization
+        path: vis-action
+
+    - name: Setup PNPM
+      uses: pnpm/action-setup@v2.2.4
+      with:
+        version: latest
+        run_install: false
+
+    - name: Install Dependencies
+      run: cd vis-action && pnpm install
+      shell: bash
+
+    - name: Fetch Data
+      run: cd vis-action && pnpm move ${{ inputs.username }}
+      env:
+        GITHUB_TOKEN: ${{ inputs.token }}
+      shell: bash
+
+    - name: Build Application
+      run: cd vis-action && pnpm build
+      shell: bash
+
+    - name: Move Output
+      run: mv vis-action/build ${{ inputs.output }}
+      shell: bash
