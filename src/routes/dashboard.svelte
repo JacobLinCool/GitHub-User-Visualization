@@ -183,7 +183,6 @@
 			.attr("dy", ".35em")
 			.text(([lang]) => lang);
 
-		// x-only zoom
 		const zoom = d3
 			.zoom<any, any>()
 			.scaleExtent([1, time_units])
@@ -196,9 +195,11 @@
 				[time_units * time_unit, height],
 			])
 			.on("zoom", (evt) => {
-				console.log(evt);
+				console.log(evt.transform);
 
-				let new_start = new Date(time_range[0].getTime() + evt.transform.x);
+				let new_start = new Date(
+					time_range[0].getTime() - ((evt.transform.x / 10) * time_unit) / evt.transform.k,
+				);
 				let new_end = new Date(new_start.getTime() + (time_units * time_unit) / evt.transform.k);
 
 				if (new_start < time_range[0]) {
