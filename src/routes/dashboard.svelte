@@ -57,7 +57,7 @@
 
 		const margin = { top: 20, right: 20, bottom: 30, left: 50 };
 		const width = (element?.clientWidth || 960) - margin.left - margin.right;
-		const height = 500 - margin.top - margin.bottom;
+		const height = 400 - margin.top - margin.bottom;
 
 		const svg = d3
 			.select(element)
@@ -117,7 +117,7 @@
 
 		const margin = { top: 20, right: 20, bottom: 30, left: 50 };
 		const width = (element?.clientWidth || 960) - margin.left - margin.right;
-		const height = 500 - margin.top - margin.bottom;
+		const height = 400 - margin.top - margin.bottom;
 
 		const chart = d3.select(element).select("svg").select("g");
 
@@ -234,7 +234,13 @@
 </script>
 
 <div
-	style="flex: 1; display: flex; flex-direction: column; margin: 0 1rem 1rem 1rem; text-decoration: none; border-radius: 0.5rem; padding: 1rem; background: #f8f8f8"
+	style="flex: 1; display: flex; margin: 0 1rem 1rem 1rem; text-decoration: none; border-radius: 0.5rem; padding: 1rem; background: #f8f8f8"
 >
-	<div id="line-chart" style="border: #ccc solid 1px" />
+	<div style="flex:1">
+		<div id="line-chart" style="border: #ccc solid 1px; border-radius: 0.4rem; margin: 0.4rem" />
+		<div id="bar-chart" style="border: #ccc solid 1px; border-radius: 0.4rem; margin: 0.4rem" />
+	</div>
+	<div style="flex:1">
+		<div id="network" style="border: #ccc solid 1px; border-radius: 0.4rem; margin: 0.4rem" />
+	</div>
 </div>
