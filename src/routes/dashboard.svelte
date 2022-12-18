@@ -9,14 +9,15 @@
 	export let issues: Issues;
 
 	const repositories = repos.map((repo) => ({ ...repo, selected: true }));
-	const range = [
-		Object.values(commits)
-			.flat()
-			.reduce((min, commit) => d3.min([min, commit.date]) || new Date(0), new Date()),
-		Object.values(commits)
-			.flat()
-			.reduce((max, commit) => d3.max([max, commit.date]) || new Date(), new Date(0)),
-	];
+	let [time_start, time_end] = Object.values(commits)
+		.flat()
+		.reduce(
+			([min, max], commit) => [
+				d3.min([min, commit.date]) || new Date(0),
+				d3.max([max, commit.date]) || new Date(),
+			],
+			[new Date(), new Date(0)],
+		);
 
 	$: selected_repos = new Set(
 		repositories.filter((repo) => repo.selected).map((repo) => repo.name),
@@ -25,13 +26,13 @@
 		.filter(([repo]) => selected_repos.has(repo))
 		.map(([, commits]) => commits)
 		.flat()
-		.filter((commit) => commit.date >= range[0] && commit.date <= range[1])
+		.filter((commit) => commit.date >= time_start && commit.date <= time_end)
 		.sort((a, b) => d3.ascending(a.date, b.date));
 	$: selected_issues = Object.entries(issues)
 		.filter(([repo]) => selected_repos.has(repo))
 		.map(([, issues]) => issues)
 		.flat()
-		.filter((issue) => issue.created >= range[0] && issue.created <= range[1])
+		.filter((issue) => issue.created >= time_start && issue.created <= time_end)
 		.sort((a, b) => d3.ascending(a.created, b.created));
 
 	$: update();
@@ -100,8 +101,8 @@
 		const brush = d3.brushX().on("brush end", (event) => {
 			if (event.selection) {
 				const [x0, x1] = event.selection;
-				range[0] = x.invert(x0);
-				range[1] = x.invert(x1);
+				time_start = x.invert(x0);
+				time_end = x.invert(x1);
 			}
 		});
 
