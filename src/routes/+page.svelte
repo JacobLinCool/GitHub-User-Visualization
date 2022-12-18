@@ -44,7 +44,7 @@
 
 <div style="display: flex; flex-direction: column; height: 100%; width: 100%">
 	<div
-		style="height: 2.4rem; display: flex; align-items: center; padding: 0 1rem; background: #333; color: #fff"
+		style="min-height: 2.4rem; display: flex; align-items: center; padding: 0 1rem; background: #333; color: #fff"
 	>
 		{user?.name ? `GitHub User Visualization for ${user.name}` : "loading data ..."}
 	</div>
