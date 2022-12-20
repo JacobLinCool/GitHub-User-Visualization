@@ -334,6 +334,28 @@
 
 		chart.select<SVGGElement>("#y-axis").call(d3.axisLeft(y));
 		
+		chart.selectAll(".legend").remove();
+
+		const legend = chart
+			.selectAll(".legend")
+			.data(type_total)
+			.join("g")
+			.attr("class", "legend")
+			.attr("transform", (d, i) => `translate(0, ${i * 20})`);
+
+		legend
+			.append("rect")
+			.attr("x", 450)
+			.attr("width", 18)
+			.attr("height", 18)
+			.style("fill", (data) => data.color );
+
+		legend
+			.append("text")
+			.attr("x", 472)
+			.attr("y", 9)
+			.attr("dy", ".35em")
+			.text((data) => data.type_name);
 	}
 </script>
 
