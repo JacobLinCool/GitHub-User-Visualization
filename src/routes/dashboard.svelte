@@ -298,37 +298,41 @@
 		const width = (element?.clientWidth || 960) - margin.left - margin.right;
 		const height = 400 - margin.top - margin.bottom;
 
-		// const x = d3
-		// 	.scaleTime()
-		// 	.domain()
-		// 	.range([0, width]);
+		const x_name = d3
+			.scaleBand()
+			.domain(type_total.map(d => d.type_name))
+			.range([0, width]);
+		const x_pos = d3
+			.scaleLinear()
+			.domain([0, 5])
+			.range([0, width]);
 
 		const y = d3
 			.scaleLinear()
 			.domain([0, d3.max(type_total.values(), (data) => (data.count) ) as number])
-			.range([0, height]);
-		const x = d3
-			.scaleLinear()
-			.domain([0, 5])
-			.range([50, width]);
+			.range([height, 0]);
+
 
 		const chart = d3.select(element).select("svg").select("g");
 
 		chart.selectAll("rect").remove();
-
 		
 		chart
 			.selectAll("rect")
 			.data(type_total)
 			.join("rect")
-			.attr("x", (data, i)=>x(i))
-			.attr("y", (data)=>height - y(data.count))
+			.attr("x", (data, i) => x_pos(i) + 45)
+			.attr("y", (data) => y(data.count))
 			.attr("width", 30)
-			.attr("height", (data) =>y(data.count))
+			.attr("height", (data) => height - y(data.count))
 			.attr("fill", (data)=>data.color);
 
-			
-		
+		chart
+			.select<SVGGElement>("#x-axis")
+			.attr("transform", `translate(0, ${height})`)
+			.call(d3.axisBottom(x_name));
+
+		chart.select<SVGGElement>("#y-axis").call(d3.axisLeft(y));
 		
 	}
 </script>
