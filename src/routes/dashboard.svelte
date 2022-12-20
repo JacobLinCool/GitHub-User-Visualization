@@ -47,6 +47,8 @@
 	onMount(async () => {
 		await init_line_chart();
 		await update_line_chart();
+		await init_bar_chart();
+		await update_bar_chart();
 	});
 
 	async function init_line_chart() {
@@ -230,6 +232,63 @@
 		console.timeEnd(time_tag);
 
 		line_chart_updating = false;
+	}
+
+	async function init_bar_chart() {
+		const time_tag = `init bar chart ${new Date().toTimeString()}`;
+		console.time(time_tag);
+
+		const element = document.querySelector("#bar-chart");
+
+		const margin = { top: 20, right: 20, bottom: 30, left: 50 };
+		const width = (element?.clientWidth || 960) - margin.left - margin.right;
+		const height = 400 - margin.top - margin.bottom;
+
+		const svg = d3
+			.select(element)
+			.append("svg")
+			.attr("width", width + margin.left + margin.right)
+			.attr("height", height + margin.top + margin.bottom);
+
+		svg
+			.append("defs")
+			.append("svg:clipPath")
+			.attr("id", "clip")
+			.append("svg:rect")
+			.attr("width", width + margin.left + margin.right)
+			.attr("height", height + margin.top + margin.bottom)
+			.attr("x", -margin.left)
+			.attr("y", -margin.top);
+
+		const chart = svg
+			.append("g")
+			.attr("transform", `translate(${margin.left}, ${margin.top})`)
+			.attr("clip-path", "url(#clip)");
+
+		chart.append("g").attr("id", "x-axis");
+		chart.append("g").attr("id", "y-axis");
+
+		console.timeEnd(time_tag);
+	}
+
+	async function update_bar_chart() {
+		let type_total = {
+			"test":0, 
+			"docs":0, 
+			"ci":0, 
+			"code":0, 
+			"undefined":0, 
+		}
+
+		selected_commits.forEach(element => {
+			type_total["test"] += (element.types.test === undefined ? 0 : element.types.test);
+			type_total["docs"] += (element.types.docs === undefined ? 0 : element.types.docs);
+			type_total["ci"] += (element.types.ci === undefined ? 0 : element.types.ci);
+			type_total["code"] += (element.types.code === undefined ? 0 : element.types.code);
+			type_total["undefined"] += (element.types.undefined === undefined ? 0 : element.types.undefined);
+		});
+		
+		
 	}
 </script>
 
