@@ -288,7 +288,11 @@
 			type_total[4].count += (element.types.undefined === undefined ? 0 : element.types.undefined);
 		});
 
-		type_total.sort((a, b)=>{return b.count - a.count});
+		type_total.sort((a, b)=>{
+			if(a.type_name == "undefined") return 1;
+			if(b.type_name == "undefined") return 0;
+			return b.count - a.count
+		});
 		
 		const element = document.querySelector("#bar-chart");
 
