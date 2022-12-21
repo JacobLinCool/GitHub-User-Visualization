@@ -42,6 +42,7 @@
 	$: {
 		console.log({ repositories, time_start, time_end });
 		update_line_chart();
+		update_bar_chart();
 	}
 
 	onMount(async () => {
