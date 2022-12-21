@@ -4,8 +4,6 @@
 	import { language_color } from "$lib/ext";
 	import * as d3 from "d3";
 	import { onMount } from "svelte";
-	import { attr } from "svelte/internal";
-	import data from "$lib/data";
 
 	export let repos: Repos;
 	export let commits: Commits;
