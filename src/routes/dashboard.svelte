@@ -42,11 +42,14 @@
 	$: {
 		console.log({ repositories, time_start, time_end });
 		update_line_chart();
+		update_bar_chart();
 	}
 
 	onMount(async () => {
 		await init_line_chart();
 		await update_line_chart();
+		await init_bar_chart();
+		await update_bar_chart();
 	});
 
 	async function init_line_chart() {
@@ -230,6 +233,132 @@
 		console.timeEnd(time_tag);
 
 		line_chart_updating = false;
+	}
+
+	async function init_bar_chart() {
+		const time_tag = `init bar chart ${new Date().toTimeString()}`;
+		console.time(time_tag);
+
+		const element = document.querySelector("#bar-chart");
+
+		const margin = { top: 20, right: 20, bottom: 30, left: 50 };
+		const width = (element?.clientWidth || 960) - margin.left - margin.right;
+		const height = 400 - margin.top - margin.bottom;
+
+		const svg = d3
+			.select(element)
+			.append("svg")
+			.attr("width", width + margin.left + margin.right)
+			.attr("height", height + margin.top + margin.bottom);
+
+		svg
+			.append("defs")
+			.append("svg:clipPath")
+			.attr("id", "clip")
+			.append("svg:rect")
+			.attr("width", width + margin.left + margin.right)
+			.attr("height", height + margin.top + margin.bottom)
+			.attr("x", -margin.left)
+			.attr("y", -margin.top);
+
+		const chart = svg
+			.append("g")
+			.attr("transform", `translate(${margin.left}, ${margin.top})`)
+			.attr("clip-path", "url(#clip)");
+
+		chart.append("g").attr("id", "x-axis");
+		chart.append("g").attr("id", "y-axis");
+
+		console.timeEnd(time_tag);
+	}
+
+	async function update_bar_chart() {
+		let type_total = [
+			{type_name: "test", count: 0, color: "red"},
+			{type_name: "docs", count: 0, color: "orange"},
+			{type_name: "ci", count: 0, color: "blue"},
+			{type_name: "code", count: 0, color: "green"}, 
+			{type_name: "undefined", count: 0, color: "gray"}
+		];
+		
+		selected_commits.forEach(element => {
+			type_total[0].count += (element.types.test === undefined ? 0 : element.types.test);
+			type_total[1].count += (element.types.docs === undefined ? 0 : element.types.docs);
+			type_total[2].count += (element.types.ci === undefined ? 0 : element.types.ci);
+			type_total[3].count += (element.types.code === undefined ? 0 : element.types.code);
+			type_total[4].count += (element.types.undefined === undefined ? 0 : element.types.undefined);
+		});
+
+		type_total.sort((a, b)=>{
+			if(a.type_name == "undefined") return 1;
+			if(b.type_name == "undefined") return 0;
+			return b.count - a.count
+		});
+		
+		const element = document.querySelector("#bar-chart");
+
+		const margin = { top: 20, right: 20, bottom: 30, left: 50 };
+		const width = (element?.clientWidth || 960) - margin.left - margin.right;
+		const height = 400 - margin.top - margin.bottom;
+
+		const x_name = d3
+			.scaleBand()
+			.domain(type_total.map(d => d.type_name))
+			.range([0, width]);
+		const x_pos = d3
+			.scaleLinear()
+			.domain([0, 5])
+			.range([0, width]);
+
+		const y = d3
+			.scaleLinear()
+			.domain([0, d3.max(type_total.values(), (data) => (data.count) ) as number])
+			.range([height, 0]);
+
+
+		const chart = d3.select(element).select("svg").select("g");
+
+		chart.selectAll("rect").remove();
+		
+		chart
+			.selectAll("rect")
+			.data(type_total)
+			.join("rect")
+			.attr("x", (data, i) => x_pos(i) + 45)
+			.attr("y", (data) => y(data.count))
+			.attr("width", 30)
+			.attr("height", (data) => height - y(data.count))
+			.attr("fill", (data)=>data.color);
+
+		chart
+			.select<SVGGElement>("#x-axis")
+			.attr("transform", `translate(0, ${height})`)
+			.call(d3.axisBottom(x_name));
+
+		chart.select<SVGGElement>("#y-axis").call(d3.axisLeft(y));
+		
+		chart.selectAll(".legend").remove();
+
+		const legend = chart
+			.selectAll(".legend")
+			.data(type_total)
+			.join("g")
+			.attr("class", "legend")
+			.attr("transform", (d, i) => `translate(0, ${i * 20})`);
+
+		legend
+			.append("rect")
+			.attr("x", 450)
+			.attr("width", 18)
+			.attr("height", 18)
+			.style("fill", (data) => data.color );
+
+		legend
+			.append("text")
+			.attr("x", 472)
+			.attr("y", 9)
+			.attr("dy", ".35em")
+			.text((data) => data.type_name);
 	}
 </script>
 
