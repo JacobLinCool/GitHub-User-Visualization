@@ -52,7 +52,9 @@ if (!fs.existsSync(dir)) {
 		checkout_pool.push(async () => {
 			checking.push(repository.name);
 			spinner.start(`Checking out commits for ${checking.join(", ")}`);
-			repo_commits[repository.name] = await commits(repository.name, username);
+			repo_commits[repository.name] = (await commits(repository.name, username)).filter(
+				(commit) => new Date(commit.date) > new Date(user.created),
+			);
 			spinner.succeed(`Checked out commits for ${repository.name}`);
 			checking.splice(checking.indexOf(repository.name), 1);
 			if (checking.length > 0) {
