@@ -1,4 +1,4 @@
-import type { CalcType, CalcLangsResult } from "./calc.worker";
+import type { CalcType, CalcLangsResult, CalcTypesResult } from "./calc.worker";
 import type { Commit } from "./types";
 
 async function run(type: CalcType, data: any) {
@@ -23,4 +23,8 @@ async function langs(commits: Commit[]): Promise<CalcLangsResult> {
 	return await run("langs", commits);
 }
 
-export default { run, langs };
+async function types(commits: Commit[]): Promise<CalcTypesResult> {
+	return await run("types", commits);
+}
+
+export default { run, langs, types };

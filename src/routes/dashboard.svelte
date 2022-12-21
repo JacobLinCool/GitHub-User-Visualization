@@ -285,27 +285,10 @@
 		bar_chart_updating = true;
 		bar_chart_final_state++;
 
-		const type_total = [
-			{ type_name: "test", count: 0, color: "red" },
-			{ type_name: "docs", count: 0, color: "orange" },
-			{ type_name: "ci", count: 0, color: "blue" },
-			{ type_name: "code", count: 0, color: "green" },
-			{ type_name: "undefined", count: 0, color: "gray" },
-		];
+		const time_tag = `update bar chart ${new Date().toTimeString()}`;
+		console.time(time_tag);
 
-		selected_commits.forEach((element) => {
-			type_total[0].count += element.types.test === undefined ? 0 : element.types.test;
-			type_total[1].count += element.types.docs === undefined ? 0 : element.types.docs;
-			type_total[2].count += element.types.ci === undefined ? 0 : element.types.ci;
-			type_total[3].count += element.types.code === undefined ? 0 : element.types.code;
-			type_total[4].count += element.types.undefined === undefined ? 0 : element.types.undefined;
-		});
-
-		type_total.sort((a, b) => {
-			if (a.type_name == "undefined") return 1;
-			if (b.type_name == "undefined") return 0;
-			return b.count - a.count;
-		});
+		const type_total = await calc.types(selected_commits);
 
 		const element = document.querySelector("#bar-chart");
 
@@ -367,6 +350,10 @@
 			.attr("y", 9)
 			.attr("dy", ".35em")
 			.text((data) => data.type_name);
+
+		console.timeEnd(time_tag);
+
+		bar_chart_updating = false;
 	}
 </script>
 
