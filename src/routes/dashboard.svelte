@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Repos, Commits, Issues } from "$lib/types";
+	import type { Repos, Commits, Issues, Issue } from "$lib/types";
 	import calc from "$lib/calc";
 	import { language_color } from "$lib/ext";
 	import * as d3 from "d3";
@@ -34,22 +34,29 @@
 		.sort((a, b) => d3.ascending(a.date, b.date));
 	$: selected_issues = Object.entries(issues)
 		.filter(([repo]) => selected_repos.has(repo))
-		.map(([, issues]) => issues)
+		.map(([repo, issues]) => issues.map((issue) => ({ ...issue, repo })))
 		.flat()
-		.filter((issue) => issue.created >= time_start && issue.created <= time_end)
+		.filter(
+			(issue) =>
+				issue.participants.length > 1 && issue.created >= time_start && issue.created <= time_end,
+		)
 		.sort((a, b) => d3.ascending(a.created, b.created));
 
 	$: {
-		console.log({ repositories, time_start, time_end });
+		console.log({ selected_repos, time_start, time_end });
+		console.log(selected_commits, selected_issues);
 		update_line_chart();
 		update_bar_chart();
+		update_network_graph();
 	}
 
 	onMount(async () => {
 		await init_line_chart();
 		await update_line_chart();
+		await init_network_graph();
 		await init_bar_chart();
 		await update_bar_chart();
+		await update_network_graph();
 	});
 
 	async function init_line_chart() {
@@ -92,12 +99,11 @@
 
 	let line_chart_updating = false;
 	let line_chart_final_state = 0;
-	async function update_line_chart() {
+	async function update_line_chart(state = line_chart_final_state + 1) {
 		if (line_chart_updating) {
-			const desired_state = line_chart_final_state + 1;
 			setTimeout(() => {
-				if (line_chart_final_state < desired_state) {
-					update_line_chart();
+				if (line_chart_final_state < state) {
+					update_line_chart(state);
 				}
 			}, 50);
 			return;
@@ -108,8 +114,6 @@
 		if (!selected_commits) {
 			return;
 		}
-
-		console.log(selected_commits);
 
 		const time_tag = `update line chart ${new Date().toTimeString()}`;
 		console.time(time_tag);
@@ -165,25 +169,27 @@
 
 		chart.selectAll(".legend").remove();
 
+		const font_scale = sorted_langs.length > 14 ? 14 / sorted_langs.length : 1;
+
 		const legend = chart
 			.selectAll(".legend")
 			.data(sorted_langs)
 			.join("g")
 			.attr("class", "legend")
-			.attr("transform", (d, i) => `translate(0, ${i * 20})`);
+			.attr("transform", (d, i) => `translate(0, ${i * 20 * font_scale})`);
 
 		legend
 			.append("rect")
 			.attr("x", 10)
-			.attr("width", 18)
-			.attr("height", 18)
+			.attr("width", 18 * font_scale)
+			.attr("height", 18 * font_scale)
 			.style("fill", ([lang]) => language_color[lang] || "#ccc");
 
 		legend
 			.append("text")
 			.attr("x", 32)
 			.attr("y", 9)
-			.attr("dy", ".35em")
+			.style("font-size", `${font_scale}rem`)
 			.text(([lang]) => lang);
 
 		const zoom = d3
@@ -272,29 +278,25 @@
 		console.timeEnd(time_tag);
 	}
 
-	async function update_bar_chart() {
-		let type_total = [
-			{type_name: "test", count: 0, color: "red"},
-			{type_name: "docs", count: 0, color: "orange"},
-			{type_name: "ci", count: 0, color: "blue"},
-			{type_name: "code", count: 0, color: "green"}, 
-			{type_name: "undefined", count: 0, color: "gray"}
-		];
-		
-		selected_commits.forEach(element => {
-			type_total[0].count += (element.types.test === undefined ? 0 : element.types.test);
-			type_total[1].count += (element.types.docs === undefined ? 0 : element.types.docs);
-			type_total[2].count += (element.types.ci === undefined ? 0 : element.types.ci);
-			type_total[3].count += (element.types.code === undefined ? 0 : element.types.code);
-			type_total[4].count += (element.types.undefined === undefined ? 0 : element.types.undefined);
-		});
+	let bar_chart_updating = false;
+	let bar_chart_final_state = 0;
+	async function update_bar_chart(state = bar_chart_final_state + 1) {
+		if (bar_chart_updating) {
+			setTimeout(() => {
+				if (bar_chart_final_state < state) {
+					update_bar_chart(state);
+				}
+			}, 50);
+			return;
+		}
+		bar_chart_updating = true;
+		bar_chart_final_state++;
 
-		type_total.sort((a, b)=>{
-			if(a.type_name == "undefined") return 1;
-			if(b.type_name == "undefined") return 0;
-			return b.count - a.count
-		});
-		
+		const time_tag = `update bar chart ${new Date().toTimeString()}`;
+		console.time(time_tag);
+
+		const type_total = await calc.types(selected_commits);
+
 		const element = document.querySelector("#bar-chart");
 
 		const margin = { top: 20, right: 20, bottom: 30, left: 50 };
@@ -303,23 +305,19 @@
 
 		const x_name = d3
 			.scaleBand()
-			.domain(type_total.map(d => d.type_name))
+			.domain(type_total.map((d) => d.type_name))
 			.range([0, width]);
-		const x_pos = d3
-			.scaleLinear()
-			.domain([0, 5])
-			.range([0, width]);
+		const x_pos = d3.scaleLinear().domain([0, 5]).range([0, width]);
 
 		const y = d3
 			.scaleLinear()
-			.domain([0, d3.max(type_total.values(), (data) => (data.count) ) as number])
+			.domain([0, d3.max(type_total.values(), (data) => data.count) as number])
 			.range([height, 0]);
-
 
 		const chart = d3.select(element).select("svg").select("g");
 
 		chart.selectAll("rect").remove();
-		
+
 		chart
 			.selectAll("rect")
 			.data(type_total)
@@ -328,7 +326,7 @@
 			.attr("y", (data) => y(data.count))
 			.attr("width", 30)
 			.attr("height", (data) => height - y(data.count))
-			.attr("fill", (data)=>data.color);
+			.attr("fill", (data) => data.color);
 
 		chart
 			.select<SVGGElement>("#x-axis")
@@ -336,7 +334,7 @@
 			.call(d3.axisBottom(x_name));
 
 		chart.select<SVGGElement>("#y-axis").call(d3.axisLeft(y));
-		
+
 		chart.selectAll(".legend").remove();
 
 		const legend = chart
@@ -348,17 +346,219 @@
 
 		legend
 			.append("rect")
-			.attr("x", 450)
+			.attr("x", width - 80)
 			.attr("width", 18)
 			.attr("height", 18)
-			.style("fill", (data) => data.color );
+			.style("fill", (data) => data.color);
 
 		legend
 			.append("text")
-			.attr("x", 472)
+			.attr("x", width - 56)
 			.attr("y", 9)
 			.attr("dy", ".35em")
 			.text((data) => data.type_name);
+
+		console.timeEnd(time_tag);
+
+		bar_chart_updating = false;
+	}
+
+	async function init_network_graph() {
+		const time_tag = `init network ${new Date().toTimeString()}`;
+		console.time(time_tag);
+
+		const element = document.querySelector("#network");
+
+		const margin = { top: 20, right: 20, bottom: 30, left: 50 };
+		const width = (element?.clientWidth || 800) - margin.left - margin.right;
+		const height = (element?.clientHeight || 800) - margin.top - margin.bottom;
+
+		const svg = d3
+			.select(element)
+			.append("svg")
+			.attr("width", width + margin.left + margin.right)
+			.attr("height", height + margin.top + margin.bottom)
+			.style("overflow", "hidden");
+
+		const graph = svg.append("g").attr("transform", `translate(${margin.left}, ${margin.top})`);
+
+		console.timeEnd(time_tag);
+	}
+
+	let network_graph_updating = false;
+	let network_graph_final_state = 0;
+	async function update_network_graph(state = network_graph_final_state + 1) {
+		if (network_graph_updating) {
+			setTimeout(() => {
+				if (network_graph_final_state < state) {
+					update_network_graph(state);
+				}
+			}, 50);
+			return;
+		}
+		network_graph_updating = true;
+		network_graph_final_state++;
+
+		if (!selected_commits) {
+			network_graph_updating = false;
+			return;
+		}
+
+		const time_tag = `update network ${new Date().toTimeString()}`;
+		console.time(time_tag);
+
+		const element = document.querySelector("#network");
+
+		const margin = { top: 20, right: 20, bottom: 30, left: 50 };
+		const width = (element?.clientWidth || 800) - margin.left - margin.right;
+		const height = (element?.clientHeight || 800) - margin.top - margin.bottom;
+
+		const svg = d3.select(element).select("svg");
+		const graph = svg.select("g");
+
+		graph.selectAll("*").remove();
+
+		const { self, max, nodes, links } = await calc.graph(selected_issues);
+
+		console.log("network", nodes, links);
+
+		if (nodes.length < 2) {
+			network_graph_updating = false;
+			return;
+		}
+
+		const link = graph
+			.append("g")
+			.selectAll("line")
+			.data(links)
+			.join("line")
+			.attr("stroke-width", (d) => 2.5 + (d.value / max) * 5)
+			.attr("stroke", (d) => {
+				if (d.source === self.name) {
+					return "purple";
+				}
+				return "gray";
+			})
+			.attr("stroke-opacity", (d) => 0.3 + (d.value / max) * 0.7);
+
+		link.append("title").text((d) => `${d.value} issue${d.value > 1 ? "s" : ""}`);
+
+		const node = graph
+			.append("g")
+			.attr("stroke", "#fff")
+			.attr("stroke-width", 1.5)
+			.selectAll("circle")
+			.data(nodes)
+			.join("circle")
+			.attr("r", (d) => 5 + Math.min(1, d.count / max) * 10)
+			.attr("fill", (d) => {
+				if (d.name === self.name) {
+					return "purple";
+				} else if (d.type === "user") {
+					return "royalblue";
+				} else if (d.type === "repo" && selected_repos.has(d.name)) {
+					return "red";
+				} else {
+					return "black";
+				}
+			});
+		// .on("click", (evt, d) => {
+		// 	if (d.type === "repo") {
+		// 		if (selected_repos.has(d.name)) {
+		// 			selected_repos.delete(d.name);
+		// 		} else {
+		// 			selected_repos.add(d.name);
+		// 		}
+		// 		selected_repos = selected_repos;
+		// 	}
+		// });
+
+		node.append("title").text((d) => `${d.name} - ${d.count} issue${d.count > 1 ? "s" : ""}`);
+
+		const simulation = d3
+			.forceSimulation(nodes as any)
+			.force(
+				"link",
+				d3
+					.forceLink(links as any)
+					.id((d: any) => d.name)
+					.strength(0.2),
+			)
+			.force(
+				"collide",
+				d3
+					.forceCollide()
+					.radius((d: any) => 7 + Math.min(1, d.count / max) * 10)
+					.iterations(2),
+			)
+			.force("charge", d3.forceManyBody().strength(-10))
+			.force(
+				"radial",
+				d3
+					.forceRadial(
+						(d: any) => (d.name === self.name ? 0 : d.type === "repo" ? 150 : 300),
+						width / 2,
+						height / 2,
+					)
+					.strength(5),
+			)
+			.force("center", d3.forceCenter(width / 2, height / 2));
+
+		simulation.on("tick", () => {
+			node.attr("transform", (node) => `translate(${node.x},${node.y})`);
+			link
+				// @ts-ignore
+				.attr("x1", (d) => d.source.x)
+				// @ts-ignore
+				.attr("y1", (d) => d.source.y)
+				// @ts-ignore
+				.attr("x2", (d) => d.target.x)
+				// @ts-ignore
+				.attr("y2", (d) => d.target.y);
+
+			link.select("title").text((d) => {
+				// @ts-expect-error
+				return `${d.source.name} - [${d.value} issue${d.value > 1 ? "s" : ""}] - ${d.target.name}`;
+			});
+		});
+
+		// function drag(simulation: d3.Simulation<d3.SimulationNodeDatum, undefined>) {
+		// 	function dragstarted(
+		// 		event: d3.D3DragEvent<SVGElement, d3.SimulationNodeDatum, undefined>,
+		// 		node: d3.SimulationNodeDatum,
+		// 	) {
+		// 		if (!event.active) {
+		// 			simulation.alphaTarget(0.3).restart();
+		// 		}
+		// 		node.fx = node.x;
+		// 		node.fy = node.y;
+		// 	}
+		// 	function dragged(
+		// 		event: d3.D3DragEvent<SVGElement, d3.SimulationNodeDatum, undefined>,
+		// 		node: d3.SimulationNodeDatum,
+		// 	) {
+		// 		node.fx = event.x;
+		// 		node.fy = event.y;
+		// 	}
+		// 	function dragended(
+		// 		event: d3.D3DragEvent<SVGElement, d3.SimulationNodeDatum, undefined>,
+		// 		node: d3.SimulationNodeDatum,
+		// 	) {
+		// 		if (!event.active) {
+		// 			simulation.alphaTarget(0);
+		// 		}
+		// 		node.fx = null;
+		// 		node.fy = null;
+		// 	}
+		// 	// @ts-ignore
+		// 	return d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended);
+		// }
+
+		// node.call(drag(simulation));
+
+		console.timeEnd(time_tag);
+
+		network_graph_updating = false;
 	}
 </script>
 

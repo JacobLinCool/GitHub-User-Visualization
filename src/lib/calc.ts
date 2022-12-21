@@ -1,5 +1,5 @@
-import type { CalcType, CalcLangsResult } from "./calc.worker";
-import type { Commit } from "./types";
+import type { CalcType, CalcLangsResult, CalcTypesResult, CalcGraphResult } from "./calc.worker";
+import type { Commit, Issue } from "./types";
 
 async function run(type: CalcType, data: any) {
 	const worker = new (await import("$lib/calc.worker?worker")).default();
@@ -23,4 +23,12 @@ async function langs(commits: Commit[]): Promise<CalcLangsResult> {
 	return await run("langs", commits);
 }
 
-export default { run, langs };
+async function types(commits: Commit[]): Promise<CalcTypesResult> {
+	return await run("types", commits);
+}
+
+async function graph(issues: (Issue & { repo: string })[]): Promise<CalcGraphResult> {
+	return await run("graph", issues);
+}
+
+export default { run, langs, types, graph };
