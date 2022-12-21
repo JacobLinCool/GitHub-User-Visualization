@@ -92,12 +92,11 @@
 
 	let line_chart_updating = false;
 	let line_chart_final_state = 0;
-	async function update_line_chart() {
+	async function update_line_chart(state = line_chart_final_state + 1) {
 		if (line_chart_updating) {
-			const desired_state = line_chart_final_state + 1;
 			setTimeout(() => {
-				if (line_chart_final_state < desired_state) {
-					update_line_chart();
+				if (line_chart_final_state < state) {
+					update_line_chart(state);
 				}
 			}, 50);
 			return;
@@ -272,29 +271,42 @@
 		console.timeEnd(time_tag);
 	}
 
-	async function update_bar_chart() {
-		let type_total = [
-			{type_name: "test", count: 0, color: "red"},
-			{type_name: "docs", count: 0, color: "orange"},
-			{type_name: "ci", count: 0, color: "blue"},
-			{type_name: "code", count: 0, color: "green"}, 
-			{type_name: "undefined", count: 0, color: "gray"}
+	let bar_chart_updating = false;
+	let bar_chart_final_state = 0;
+	async function update_bar_chart(state = bar_chart_final_state + 1) {
+		if (bar_chart_updating) {
+			setTimeout(() => {
+				if (bar_chart_final_state < state) {
+					update_bar_chart(state);
+				}
+			}, 50);
+			return;
+		}
+		bar_chart_updating = true;
+		bar_chart_final_state++;
+
+		const type_total = [
+			{ type_name: "test", count: 0, color: "red" },
+			{ type_name: "docs", count: 0, color: "orange" },
+			{ type_name: "ci", count: 0, color: "blue" },
+			{ type_name: "code", count: 0, color: "green" },
+			{ type_name: "undefined", count: 0, color: "gray" },
 		];
-		
-		selected_commits.forEach(element => {
-			type_total[0].count += (element.types.test === undefined ? 0 : element.types.test);
-			type_total[1].count += (element.types.docs === undefined ? 0 : element.types.docs);
-			type_total[2].count += (element.types.ci === undefined ? 0 : element.types.ci);
-			type_total[3].count += (element.types.code === undefined ? 0 : element.types.code);
-			type_total[4].count += (element.types.undefined === undefined ? 0 : element.types.undefined);
+
+		selected_commits.forEach((element) => {
+			type_total[0].count += element.types.test === undefined ? 0 : element.types.test;
+			type_total[1].count += element.types.docs === undefined ? 0 : element.types.docs;
+			type_total[2].count += element.types.ci === undefined ? 0 : element.types.ci;
+			type_total[3].count += element.types.code === undefined ? 0 : element.types.code;
+			type_total[4].count += element.types.undefined === undefined ? 0 : element.types.undefined;
 		});
 
-		type_total.sort((a, b)=>{
-			if(a.type_name == "undefined") return 1;
-			if(b.type_name == "undefined") return 0;
-			return b.count - a.count
+		type_total.sort((a, b) => {
+			if (a.type_name == "undefined") return 1;
+			if (b.type_name == "undefined") return 0;
+			return b.count - a.count;
 		});
-		
+
 		const element = document.querySelector("#bar-chart");
 
 		const margin = { top: 20, right: 20, bottom: 30, left: 50 };
@@ -303,23 +315,19 @@
 
 		const x_name = d3
 			.scaleBand()
-			.domain(type_total.map(d => d.type_name))
+			.domain(type_total.map((d) => d.type_name))
 			.range([0, width]);
-		const x_pos = d3
-			.scaleLinear()
-			.domain([0, 5])
-			.range([0, width]);
+		const x_pos = d3.scaleLinear().domain([0, 5]).range([0, width]);
 
 		const y = d3
 			.scaleLinear()
-			.domain([0, d3.max(type_total.values(), (data) => (data.count) ) as number])
+			.domain([0, d3.max(type_total.values(), (data) => data.count) as number])
 			.range([height, 0]);
-
 
 		const chart = d3.select(element).select("svg").select("g");
 
 		chart.selectAll("rect").remove();
-		
+
 		chart
 			.selectAll("rect")
 			.data(type_total)
@@ -328,7 +336,7 @@
 			.attr("y", (data) => y(data.count))
 			.attr("width", 30)
 			.attr("height", (data) => height - y(data.count))
-			.attr("fill", (data)=>data.color);
+			.attr("fill", (data) => data.color);
 
 		chart
 			.select<SVGGElement>("#x-axis")
@@ -336,7 +344,7 @@
 			.call(d3.axisBottom(x_name));
 
 		chart.select<SVGGElement>("#y-axis").call(d3.axisLeft(y));
-		
+
 		chart.selectAll(".legend").remove();
 
 		const legend = chart
@@ -351,7 +359,7 @@
 			.attr("x", 450)
 			.attr("width", 18)
 			.attr("height", 18)
-			.style("fill", (data) => data.color );
+			.style("fill", (data) => data.color);
 
 		legend
 			.append("text")
