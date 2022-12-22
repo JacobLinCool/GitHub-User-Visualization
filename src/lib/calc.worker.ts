@@ -78,7 +78,11 @@ function calc_types(commits: Commit[]): CalcTypesResult {
 	return type_total;
 }
 
-function calc_graph(issues: (Issue & { repo: string })[]): CalcGraphResult {
+function calc_graph(data: {
+	issues: (Issue & { repo: string })[];
+	threshold: number;
+}): CalcGraphResult {
+	const issues = data.issues;
 	const [self, ...others] = Object.entries(
 		issues.reduce((acc, issue) => {
 			issue.participants.forEach((username) => {
@@ -88,7 +92,7 @@ function calc_graph(issues: (Issue & { repo: string })[]): CalcGraphResult {
 		}, {} as Record<string, number>),
 	)
 		.sort((a, b) => b[1] - a[1])
-		.map(([name, count], i) => ({
+		.map(([name, count]) => ({
 			name,
 			count,
 			x: 0,
@@ -113,7 +117,7 @@ function calc_graph(issues: (Issue & { repo: string })[]): CalcGraphResult {
 		}, {} as Record<string, [number, Record<string, number>]>),
 	)
 		.sort((a, b) => b[1][0] - a[1][0])
-		.map(([name, [count, users]], i) => ({
+		.map(([name, [count, users]]) => ({
 			name,
 			count,
 			x: 0,
@@ -122,9 +126,22 @@ function calc_graph(issues: (Issue & { repo: string })[]): CalcGraphResult {
 			users,
 		}));
 
-	const nodes = [self, ...repos, ...others];
-
 	const max = Math.max(...repos.map((other) => other.count), ...others.map((other) => other.count));
+
+	for (let i = repos.length - 1; i >= 0; i--) {
+		if (repos[i].count < max * data.threshold) {
+			repos.splice(i, 1);
+		}
+	}
+
+	for (let i = others.length - 1; i >= 0; i--) {
+		if (others[i].count < max * data.threshold) {
+			others.splice(i, 1);
+		}
+	}
+
+	const nodes = [self, ...repos, ...others];
+	const set = new Set(nodes.map((n) => n.name));
 
 	const links = [
 		...repos.map((repo) => ({
@@ -142,7 +159,7 @@ function calc_graph(issues: (Issue & { repo: string })[]): CalcGraphResult {
 			)
 			.flat()
 			.filter((link) => link.target !== self.name),
-	];
+	].filter((link) => set.has(link.source) && set.has(link.target));
 
 	return { self, nodes, links, max };
 }

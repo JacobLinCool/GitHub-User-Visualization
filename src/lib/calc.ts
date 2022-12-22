@@ -27,8 +27,11 @@ async function types(commits: Commit[]): Promise<CalcTypesResult> {
 	return await run("types", commits);
 }
 
-async function graph(issues: (Issue & { repo: string })[]): Promise<CalcGraphResult> {
-	return await run("graph", issues);
+async function graph(data: {
+	issues: (Issue & { repo: string })[];
+	threshold: number;
+}): Promise<CalcGraphResult> {
+	return await run("graph", data);
 }
 
 export default { run, langs, types, graph };

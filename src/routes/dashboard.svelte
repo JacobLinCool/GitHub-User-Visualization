@@ -147,7 +147,6 @@
 		chart.select<SVGGElement>("#y-axis").call(d3.axisLeft(y));
 
 		chart.selectAll(".line").remove();
-
 		chart
 			.selectAll(".line")
 			.data(languages)
@@ -164,9 +163,9 @@
 					.y((d) => y(d))(data[1]);
 			});
 
-		const sorted_langs = Array.from(languages.entries()).sort(([, a], [, b]) =>
-			d3.descending(d3.sum(a), d3.sum(b)),
-		);
+		const sorted_langs = Array.from(languages.entries())
+			.sort(([, a], [, b]) => d3.descending(d3.sum(a), d3.sum(b)))
+			.slice(0, 10);
 
 		chart.selectAll(".legend").remove();
 
@@ -220,12 +219,7 @@
 
 				let new_end = new Date(new_start.getTime() + (time_units * time_unit) / evt.transform.k);
 
-				console.log({
-					new_start,
-					new_end,
-					time_start,
-					time_end,
-				});
+				console.log({ new_start, new_end, time_start, time_end });
 				time_start = new_start;
 				time_end = new_end;
 			});
@@ -365,6 +359,11 @@
 		bar_chart_updating = false;
 	}
 
+	let network_threshold = 0;
+	$: {
+		console.log("network threshold changed", network_threshold);
+		update_network_graph();
+	}
 	async function init_network_graph() {
 		const time_tag = `init network ${new Date().toTimeString()}`;
 		console.time(time_tag);
@@ -384,24 +383,48 @@
 
 		const graph = svg.append("g").attr("transform", `translate(${margin.left}, ${margin.top})`);
 
+		const zoom = d3
+			.zoom<any, any>()
+			.scaleExtent([0, 1])
+			.on("zoom", (event) => {
+				network_threshold = event.transform.k;
+			});
+
+		graph
+			.append("rect")
+			.attr("id", "threshold")
+			.attr("width", width)
+			.attr("height", height)
+			.attr("fill", "none")
+			.attr("pointer-events", "all")
+			.call(zoom);
+
+		graph.append("g").attr("id", "links");
+		graph.append("g").attr("id", "nodes").attr("stroke", "#fff").attr("stroke-width", 1.5);
+
+		graph.append("text").attr("id", "threshold-text");
+
 		console.timeEnd(time_tag);
 	}
 
 	let network_graph_updating = false;
 	let network_graph_final_state = 0;
+	const position_cache = new Map<string, { x: number; y: number }>();
 	async function update_network_graph(state = network_graph_final_state + 1) {
+		if (state > network_graph_final_state) {
+			network_graph_final_state = state;
+		}
 		if (network_graph_updating) {
 			setTimeout(() => {
-				if (network_graph_final_state < state) {
+				if (network_graph_final_state === state) {
 					update_network_graph(state);
 				}
-			}, 50);
+			}, 200);
 			return;
 		}
 		network_graph_updating = true;
-		network_graph_final_state++;
 
-		if (!selected_commits) {
+		if (!selected_issues || selected_issues.length < 1) {
 			network_graph_updating = false;
 			return;
 		}
@@ -418,9 +441,10 @@
 		const svg = d3.select(element).select("svg");
 		const graph = svg.select("g");
 
-		graph.selectAll("*").remove();
-
-		const { self, max, nodes, links } = await calc.graph(selected_issues);
+		const { self, max, nodes, links } = await calc.graph({
+			issues: selected_issues,
+			threshold: network_threshold,
+		});
 
 		console.log("network", nodes, links);
 
@@ -429,52 +453,54 @@
 			return;
 		}
 
+		nodes.forEach((node) => {
+			if (position_cache.has(node.name)) {
+				node.x = position_cache.get(node.name)?.x || 0;
+				node.y = position_cache.get(node.name)?.y || 0;
+			}
+		});
+
 		const link = graph
-			.append("g")
+			.select<SVGGElement>("#links")
 			.selectAll("line")
 			.data(links)
 			.join("line")
 			.attr("stroke-width", (d) => 2.5 + (d.value / max) * 5)
-			.attr("stroke", (d) => {
-				if (d.source === self.name) {
-					return "purple";
-				}
-				return "gray";
-			})
-			.attr("stroke-opacity", (d) => 0.3 + (d.value / max) * 0.7);
+			.attr("stroke", (d) => (d.source === self.name ? "purple" : "gray"))
+			.attr("stroke-opacity", (d) => 0.3 + (d.value / max) * 0.5);
 
 		link.append("title").text((d) => `${d.value} issue${d.value > 1 ? "s" : ""}`);
 
-		const node = graph
-			.append("g")
-			.attr("stroke", "#fff")
-			.attr("stroke-width", 1.5)
-			.selectAll("circle")
-			.data(nodes)
-			.join("circle")
+		graph.select<SVGGElement>("#nodes").selectAll("g").remove();
+		const node = graph.select<SVGGElement>("#nodes").selectAll("g").data(nodes).join("g");
+		node
+			.append("circle")
 			.attr("r", (d) => 5 + Math.min(1, d.count / max) * 10)
 			.attr("fill", (d) => {
 				if (d.name === self.name) {
 					return "purple";
-				} else if (d.type === "user") {
-					return "royalblue";
-				} else if (d.type === "repo" && selected_repos.has(d.name)) {
-					return "red";
-				} else {
-					return "black";
 				}
+				if (d.type === "user") {
+					return "royalblue";
+				}
+				if (d.type === "repo" && selected_repos.has(d.name)) {
+					return "red";
+				}
+				return "black";
 			});
-		// .on("click", (evt, d) => {
-		// 	if (d.type === "repo") {
-		// 		if (selected_repos.has(d.name)) {
-		// 			selected_repos.delete(d.name);
-		// 		} else {
-		// 			selected_repos.add(d.name);
-		// 		}
-		// 		selected_repos = selected_repos;
-		// 	}
-		// });
-
+		node
+			.append("text")
+			.text((d) => d.name)
+			.attr("font-size", 10)
+			.attr("dx", (d) => 5 + Math.min(1, d.count / max) * 10)
+			.attr("dy", 3)
+			.style("pointer-events", "none")
+			.style("user-select", "none")
+			.style("fill", (d) =>
+				d.name === self.name ? "purple" : d.type === "user" ? "royalblue" : "red",
+			)
+			.style("stroke", "white")
+			.style("stroke-width", 0.3);
 		node.append("title").text((d) => `${d.name} - ${d.count} issue${d.count > 1 ? "s" : ""}`);
 
 		const simulation = d3
@@ -506,57 +532,70 @@
 			)
 			.force("center", d3.forceCenter(width / 2, height / 2));
 
-		simulation.on("tick", () => {
-			node.attr("transform", (node) => `translate(${node.x},${node.y})`);
-			link
-				// @ts-ignore
-				.attr("x1", (d) => d.source.x)
-				// @ts-ignore
-				.attr("y1", (d) => d.source.y)
-				// @ts-ignore
-				.attr("x2", (d) => d.target.x)
-				// @ts-ignore
-				.attr("y2", (d) => d.target.y);
+		function drag(simulation: d3.Simulation<d3.SimulationNodeDatum, undefined>) {
+			function dragstarted(
+				event: d3.D3DragEvent<SVGElement, d3.SimulationNodeDatum, undefined>,
+				node: d3.SimulationNodeDatum,
+			) {
+				if (!event.active) {
+					simulation.alphaTarget(0.3).restart();
+				}
+				node.fx = node.x;
+				node.fy = node.y;
+			}
+			function dragged(
+				event: d3.D3DragEvent<SVGElement, d3.SimulationNodeDatum, undefined>,
+				node: d3.SimulationNodeDatum,
+			) {
+				node.fx = event.x;
+				node.fy = event.y;
+			}
+			function dragended(
+				event: d3.D3DragEvent<SVGElement, d3.SimulationNodeDatum, undefined>,
+				node: d3.SimulationNodeDatum,
+			) {
+				if (!event.active) {
+					simulation.alphaTarget(0);
+				}
+				node.fx = null;
+				node.fy = null;
+			}
+			// @ts-expect-error
+			return d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended);
+		}
 
-			link.select("title").text((d) => {
-				// @ts-expect-error
-				return `${d.source.name} - [${d.value} issue${d.value > 1 ? "s" : ""}] - ${d.target.name}`;
+		node.call(drag(simulation));
+
+		simulation
+			.on("tick", () => {
+				node.attr("transform", (node) => `translate(${node.x},${node.y})`);
+				link
+					// @ts-expect-error
+					.attr("x1", (d) => d.source.x)
+					// @ts-expect-error
+					.attr("y1", (d) => d.source.y)
+					// @ts-expect-error
+					.attr("x2", (d) => d.target.x)
+					// @ts-expect-error
+					.attr("y2", (d) => d.target.y);
+
+				link.select("title").text((d) => {
+					// @ts-expect-error
+					return `${d.source.name} - [${d.value} issue${d.value > 1 ? "s" : ""}] - ${
+						// @ts-expect-error
+						d.target.name
+					}`;
+				});
+			})
+			.on("end", () => {
+				for (const node of nodes) {
+					position_cache.set(node.name, { x: node.x, y: node.y });
+				}
 			});
-		});
 
-		// function drag(simulation: d3.Simulation<d3.SimulationNodeDatum, undefined>) {
-		// 	function dragstarted(
-		// 		event: d3.D3DragEvent<SVGElement, d3.SimulationNodeDatum, undefined>,
-		// 		node: d3.SimulationNodeDatum,
-		// 	) {
-		// 		if (!event.active) {
-		// 			simulation.alphaTarget(0.3).restart();
-		// 		}
-		// 		node.fx = node.x;
-		// 		node.fy = node.y;
-		// 	}
-		// 	function dragged(
-		// 		event: d3.D3DragEvent<SVGElement, d3.SimulationNodeDatum, undefined>,
-		// 		node: d3.SimulationNodeDatum,
-		// 	) {
-		// 		node.fx = event.x;
-		// 		node.fy = event.y;
-		// 	}
-		// 	function dragended(
-		// 		event: d3.D3DragEvent<SVGElement, d3.SimulationNodeDatum, undefined>,
-		// 		node: d3.SimulationNodeDatum,
-		// 	) {
-		// 		if (!event.active) {
-		// 			simulation.alphaTarget(0);
-		// 		}
-		// 		node.fx = null;
-		// 		node.fy = null;
-		// 	}
-		// 	// @ts-ignore
-		// 	return d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended);
-		// }
-
-		// node.call(drag(simulation));
+		graph
+			.select<SVGTextElement>("#threshold-text")
+			.text(`Threshold: ${Math.floor(max * network_threshold)} issues`);
 
 		console.timeEnd(time_tag);
 
