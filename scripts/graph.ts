@@ -80,7 +80,7 @@ export async function graph(
 			})) as MetaResult;
 
 			Object.assign(user, {
-				name: result.user.name,
+				name: result.user.name || username,
 				company: result.user.company,
 				avatar: result.user.avatar,
 				created: result.user.created,
