@@ -141,15 +141,17 @@ function calc_graph(data: {
 
 	const max = Math.max(...repos.map((other) => other.count), ...others.map((other) => other.count));
 
-	for (let i = repos.length - 1; i >= 0; i--) {
-		if (repos[i].count < max * data.threshold) {
-			repos.splice(i, 1);
-		}
-	}
-
 	for (let i = others.length - 1; i >= 0; i--) {
 		if (others[i].count < max * data.threshold) {
 			others.splice(i, 1);
+		}
+	}
+
+	const other_set = new Set(others.map((o) => o.name));
+
+	for (let i = repos.length - 1; i >= 0; i--) {
+		if (!Object.keys(repos[i].users).some((name) => other_set.has(name))) {
+			repos.splice(i, 1);
 		}
 	}
 
