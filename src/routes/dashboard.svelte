@@ -128,6 +128,50 @@
 
 		const chart = d3.select(element).select("svg").select("g");
 
+		const zoom = d3
+			.zoom<any, any>()
+			.scaleExtent([1, time_units / 5])
+			.translateExtent([
+				[0, -Infinity],
+				[time_units * time_unit, Infinity],
+			])
+			.extent([
+				[0, 0],
+				[time_units * time_unit, height],
+			])
+			.on("zoom", (evt) => {
+				console.log(evt.transform);
+
+				let new_start = new Date(
+					time_range[0].getTime() - ((evt.transform.x / 10) * time_unit) / evt.transform.k,
+				);
+				let new_end = new Date(new_start.getTime() + (time_units * time_unit) / evt.transform.k);
+
+				if (new_start < time_range[0]) {
+					new_start = time_range[0];
+				}
+				if (new_end > time_range[1]) {
+					new_end = time_range[1];
+				}
+
+				console.log({
+					new_start,
+					new_end,
+					time_start,
+					time_end,
+				});
+				time_start = new_start;
+				time_end = new_end;
+			});
+
+		chart
+			.select<SVGRectElement>("#zoom")
+			.attr("width", width)
+			.attr("height", height)
+			.attr("fill", "none")
+			.attr("pointer-events", "all")
+			.call(zoom);
+
 		const x = d3
 			.scaleTime()
 			.domain(d3.extent(selected_commits, (commit) => commit.date) as [Date, Date])
@@ -141,7 +185,10 @@
 		chart
 			.select<SVGGElement>("#x-axis")
 			.attr("transform", `translate(0, ${height})`)
-			.call(d3.axisBottom(x));
+			.call(
+				d3.axisBottom(x)
+				.ticks(d3.timeMonth.every((time_end.getMinutes() - time_start.getMinutes()) / time_unit * 6))
+			);
 
 		chart.select<SVGGElement>("#y-axis").call(d3.axisLeft(y));
 
@@ -190,51 +237,7 @@
 			.attr("x", 32)
 			.attr("y", 9)
 			.style("font-size", `${font_scale}rem`)
-			.text(([lang]) => lang);
-
-		const zoom = d3
-			.zoom<any, any>()
-			.scaleExtent([1, time_units])
-			.translateExtent([
-				[0, -Infinity],
-				[time_units * time_unit, Infinity],
-			])
-			.extent([
-				[0, 0],
-				[time_units * time_unit, height],
-			])
-			.on("zoom", (evt) => {
-				console.log(evt.transform);
-
-				let new_start = new Date(
-					time_range[0].getTime() - ((evt.transform.x / 10) * time_unit) / evt.transform.k,
-				);
-				let new_end = new Date(new_start.getTime() + (time_units * time_unit) / evt.transform.k);
-
-				if (new_start < time_range[0]) {
-					new_start = time_range[0];
-				}
-				if (new_end > time_range[1]) {
-					new_end = time_range[1];
-				}
-
-				console.log({
-					new_start,
-					new_end,
-					time_start,
-					time_end,
-				});
-				time_start = new_start;
-				time_end = new_end;
-			});
-
-		chart
-			.select<SVGRectElement>("#zoom")
-			.attr("width", width)
-			.attr("height", height)
-			.attr("fill", "none")
-			.attr("pointer-events", "all")
-			.call(zoom);
+			.text(([lang]) => lang);		
 
 		console.timeEnd(time_tag);
 
