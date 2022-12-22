@@ -494,13 +494,23 @@
 			.attr("font-size", 10)
 			.attr("dx", (d) => 5 + Math.min(1, d.count / max) * 10)
 			.attr("dy", 3)
-			.style("pointer-events", "none")
 			.style("user-select", "none")
 			.style("fill", (d) =>
 				d.name === self.name ? "purple" : d.type === "user" ? "royalblue" : "red",
 			)
 			.style("stroke", "white")
-			.style("stroke-width", 0.3);
+			.style("stroke-width", 0.3)
+			.style("cursor", "pointer")
+			.on("click", (evt, d) => {
+				const url = `https://github.com/${d.name}`;
+				console.log("open", url);
+				setTimeout(() => {
+					const win = window.open("about:blank", "_blank");
+					if (win) {
+						win.location = url;
+					}
+				}, 0);
+			});
 		node.append("title").text((d) => `${d.name} - ${d.count} issue${d.count > 1 ? "s" : ""}`);
 
 		const simulation = d3
