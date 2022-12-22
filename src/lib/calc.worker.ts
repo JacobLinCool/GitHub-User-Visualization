@@ -48,7 +48,9 @@ function calc_langs(commits: Commit[]): CalcLangsResult {
 	return { languages, months };
 }
 
-function calc_types(commits: Commit[]): CalcTypesResult {
+function calc_types(data: { commits: Commit[]; disabled: Set<string> }): CalcTypesResult {
+	const commits = data.commits;
+
 	const type_total = [
 		{ type_name: "test", count: 0, color: "red" },
 		{ type_name: "docs", count: 0, color: "orange" },
@@ -58,6 +60,17 @@ function calc_types(commits: Commit[]): CalcTypesResult {
 	];
 
 	for (const commit of commits) {
+		let ignore = false;
+		for (const lang of Object.keys(commit.langs)) {
+			if (data.disabled.has(lang)) {
+				ignore = true;
+				break;
+			}
+		}
+		if (ignore) {
+			continue;
+		}
+
 		type_total[0].count += commit.types.test === undefined ? 0 : commit.types.test;
 		type_total[1].count += commit.types.docs === undefined ? 0 : commit.types.docs;
 		type_total[2].count += commit.types.ci === undefined ? 0 : commit.types.ci;

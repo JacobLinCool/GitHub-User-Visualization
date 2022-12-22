@@ -99,6 +99,12 @@
 
 	let line_chart_updating = false;
 	let line_chart_final_state = 0;
+	let disabled_lang = new Set<string>();
+	$: {
+		console.log("disabled lang", disabled_lang);
+		update_line_chart();
+		update_bar_chart();
+	}
 	async function update_line_chart(state = line_chart_final_state + 1) {
 		if (line_chart_updating) {
 			setTimeout(() => {
@@ -112,6 +118,7 @@
 		line_chart_final_state++;
 
 		if (!selected_commits) {
+			line_chart_updating = false;
 			return;
 		}
 
@@ -119,6 +126,16 @@
 		console.time(time_tag);
 
 		const { languages, months } = await calc.langs(selected_commits);
+
+		const sorted_langs = Array.from(languages.entries())
+			.sort(([, a], [, b]) => d3.descending(d3.sum(a), d3.sum(b)))
+			.slice(0, 10);
+
+		for (const lang of languages.keys()) {
+			if (!sorted_langs.some(([l]) => l === lang)) {
+				languages.delete(lang);
+			}
+		}
 
 		const element = document.querySelector("#line-chart");
 
@@ -136,36 +153,22 @@
 
 		const y = d3
 			.scaleLinear()
-			.domain([0, d3.max(languages.values(), (data) => d3.max(data) as number) as number])
+			.domain([
+				0,
+				d3.max(
+					languages.entries(),
+					([lang, data]) => (disabled_lang.has(lang) ? 0 : d3.max(data)) as number,
+				) as number,
+			])
 			.range([height, 0]);
 
 		chart
 			.select<SVGGElement>("#x-axis")
 			.attr("transform", `translate(0, ${height})`)
+			.transition()
 			.call(d3.axisBottom(x));
 
-		chart.select<SVGGElement>("#y-axis").call(d3.axisLeft(y));
-
-		chart.selectAll(".line").remove();
-		chart
-			.selectAll(".line")
-			.data(languages)
-			.join("path")
-			.attr("class", "line")
-			.attr("fill", "none")
-			.attr("stroke", ([lang]) => language_color[lang] || "#ccc")
-			.attr("stroke-width", 1.5)
-			.attr("d", (data) => {
-				const iter = months.keys();
-				return d3
-					.line<number>()
-					.x((_, i) => x(new Date(iter.next().value)))
-					.y((d) => y(d))(data[1]);
-			});
-
-		const sorted_langs = Array.from(languages.entries())
-			.sort(([, a], [, b]) => d3.descending(d3.sum(a), d3.sum(b)))
-			.slice(0, 10);
+		chart.select<SVGGElement>("#y-axis").transition().call(d3.axisLeft(y));
 
 		chart.selectAll(".legend").remove();
 
@@ -176,7 +179,18 @@
 			.data(sorted_langs)
 			.join("g")
 			.attr("class", "legend")
-			.attr("transform", (d, i) => `translate(0, ${i * 20 * font_scale})`);
+			.attr("transform", (d, i) => `translate(0, ${i * 20 * font_scale})`)
+			.style("cursor", "pointer")
+			.style("opacity", ([lang]) => (disabled_lang.has(lang) ? 0.4 : 1))
+			.on("click", (evt, [lang]) => {
+				if (disabled_lang.has(lang)) {
+					disabled_lang.delete(lang);
+				} else {
+					disabled_lang.add(lang);
+				}
+
+				disabled_lang = disabled_lang;
+			});
 
 		legend
 			.append("rect")
@@ -189,8 +203,26 @@
 			.append("text")
 			.attr("x", 32)
 			.attr("y", 9)
+			.attr("dy", "0.3rem")
 			.style("font-size", `${font_scale}rem`)
 			.text(([lang]) => lang);
+
+		chart.selectAll(".line").remove();
+		chart
+			.selectAll(".line")
+			.data([...languages.entries()].filter(([lang]) => !disabled_lang.has(lang)))
+			.join("path")
+			.attr("class", "line")
+			.attr("fill", "none")
+			.attr("stroke", ([lang]) => language_color[lang] || "#ccc")
+			.attr("stroke-width", 1.5)
+			.attr("d", (data) => {
+				const iter = months.keys();
+				return d3
+					.line<number>()
+					.x((_, i) => x(new Date(iter.next().value)))
+					.y((d) => y(d))(data[1]);
+			});
 
 		const zoom = d3
 			.zoom<any, any>()
@@ -288,10 +320,15 @@
 		bar_chart_updating = true;
 		bar_chart_final_state++;
 
+		if (!selected_commits) {
+			bar_chart_updating = false;
+			return;
+		}
+
 		const time_tag = `update bar chart ${new Date().toTimeString()}`;
 		console.time(time_tag);
 
-		const type_total = await calc.types(selected_commits);
+		const type_total = await calc.types({ commits: selected_commits, disabled: disabled_lang });
 
 		const element = document.querySelector("#bar-chart");
 
@@ -312,8 +349,6 @@
 
 		const chart = d3.select(element).select("svg").select("g");
 
-		chart.selectAll("rect").remove();
-
 		chart
 			.selectAll("rect")
 			.data(type_total)
@@ -322,14 +357,15 @@
 			.attr("y", (data) => y(data.count))
 			.attr("width", 30)
 			.attr("height", (data) => height - y(data.count))
-			.attr("fill", (data) => data.color);
+			.style("fill", (data) => data.color)
+			.style("transition", "all 0.3s ease-in-out");
 
 		chart
 			.select<SVGGElement>("#x-axis")
 			.attr("transform", `translate(0, ${height})`)
 			.call(d3.axisBottom(x_name));
 
-		chart.select<SVGGElement>("#y-axis").call(d3.axisLeft(y));
+		chart.select<SVGGElement>("#y-axis").transition().call(d3.axisLeft(y));
 
 		chart.selectAll(".legend").remove();
 

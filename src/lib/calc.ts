@@ -23,8 +23,8 @@ async function langs(commits: Commit[]): Promise<CalcLangsResult> {
 	return await run("langs", commits);
 }
 
-async function types(commits: Commit[]): Promise<CalcTypesResult> {
-	return await run("types", commits);
+async function types(data: { commits: Commit[]; disabled: Set<string> }): Promise<CalcTypesResult> {
+	return await run("types", data);
 }
 
 async function graph(data: {
