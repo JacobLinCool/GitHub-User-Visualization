@@ -131,7 +131,8 @@
 		const x = d3
 			.scaleTime()
 			.domain(d3.extent(selected_commits, (commit) => commit.date) as [Date, Date])
-			.range([0, width]);
+			.range([0, width])
+			.nice();
 
 		const y = d3
 			.scaleLinear()
@@ -194,7 +195,7 @@
 
 		const zoom = d3
 			.zoom<any, any>()
-			.scaleExtent([1, time_units])
+			.scaleExtent([1, time_units / 7])
 			.translateExtent([
 				[0, -Infinity],
 				[time_units * time_unit, Infinity],
@@ -209,14 +210,15 @@
 				let new_start = new Date(
 					time_range[0].getTime() - ((evt.transform.x / 10) * time_unit) / evt.transform.k,
 				);
-				let new_end = new Date(new_start.getTime() + (time_units * time_unit) / evt.transform.k);
 
 				if (new_start < time_range[0]) {
 					new_start = time_range[0];
 				}
-				if (new_end > time_range[1]) {
-					new_end = time_range[1];
+				if (new_start > new Date(time_range[1].getTime() - 0.5 * time_unit)) {
+					new_start = new Date(time_range[1].getTime() - 0.5 * time_unit);
 				}
+
+				let new_end = new Date(new_start.getTime() + (time_units * time_unit) / evt.transform.k);
 
 				console.log({
 					new_start,
